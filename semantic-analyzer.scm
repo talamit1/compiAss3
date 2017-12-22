@@ -12,9 +12,6 @@
   )
 )
 
-
-
-
 (define remove-applic-lambda-nil
   (lambda (parsedExp) 
       (cond 
