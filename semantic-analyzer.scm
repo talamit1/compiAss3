@@ -120,6 +120,7 @@
 
 (define isSetVar?
   (lambda (exp var)
+  
 
     (cond
       ;;vase we finish search
@@ -133,13 +134,13 @@
       
       ((and (equal? (car exp) 'set) (null? (cdr exp)) ) #f)
       ;;true case
-      ((and (equal? (car exp) 'set) (equal? (cadadr exp) var )) #t)
+      ((and (equal? (car exp) 'set) (equal? (cadadr exp) var ))   #t)
       ;;nested lambda expression and it contain a parameter with same name
-      ((getLambdaType (car exp))
+      ((getLambdaType  exp)
         (let* 
-            ((lambdaType (getLambdaType (car exp)))
-            (lambdaBody (getLambdaBody lambdaType (car exp)))
-            (lambdaVars (getLambdaVars lambdaType (car exp))))
+            ((lambdaType (getLambdaType exp))
+            (lambdaBody (getLambdaBody lambdaType exp))
+            (lambdaVars (getLambdaVars lambdaType exp)))
             (if(checkForDuplicateParam lambdaVars var)
                 #f
                 (isSetVar? lambdaBody var)
@@ -297,7 +298,6 @@
 
 (define putVarInBox
   (lambda (expr var)
- 
 
    (if (equal? 'seq (car expr))
    `(seq ((set (var ,var) (box (var ,var))) ,@(changeVarsInBody (cadr expr) var)))
@@ -308,7 +308,7 @@
 
 (define boxVars 
   (lambda (lambdaBody lambdaVars)
-  
+    
     (if (null? lambdaVars)
           lambdaBody
     (boxVars (putVarInBox lambdaBody (car lambdaVars)) (cdr lambdaVars))
@@ -344,6 +344,7 @@
 
 (define box-set
   (lambda (parsedExpr)
+  
     (cond 
       ((null? parsedExpr) '())
       
