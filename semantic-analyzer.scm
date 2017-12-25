@@ -118,6 +118,14 @@
   )
 )
 
+
+
+
+
+
+
+
+
 (define isSetVar?
   (lambda (exp var)
   
@@ -196,7 +204,7 @@
     ((list? (car exp)) 
       (or (isBoundVar? (car exp) var) (isBoundVar? (cdr exp) var) ))
     
-      ((getLambdaType (car exp))
+      ((getLambdaType  exp)
         (let* 
           ((lambdaType (getLambdaType exp))
           (lambdaVars (getLambdaVars lambdaType exp))
@@ -371,9 +379,102 @@
   ;; fill in the lexical addressing details here
   )
 
-(define annotate-tc
-  ;; fill in the tail-call annotation details here
+
+
+(define varOrConst
+  (lambda (x)  
+   (or (equal? x 'var)
+       (equal? x 'bvar)
+       (equal? x 'fvar)
+       (equal? x 'const)    
+    )
   )
+)
+
+(define defineOrSet
+  (lambda (exp)
+   
+    (or (equal?  exp 'define) (equal? exp 'set))
+  
+  )  
+)
+
+  (define getTestIfExp (lambda (ifExpr) (cadr ifExpr)))
+  (define getThenIfExp (lambda (ifExpr) (caddr ifExpr)))
+  (define getAltIfExp (lambda (ifExpr) (cadddr ifExpr)))
+
+  (define annotateHelperFalse
+    (lambda (exp)
+      (annotate-helper exp #f)
+    )
+)
+
+(define annotate-helper
+  (lambda (pe isTailposition?)
+    (cond
+      ((null? pe) '())
+      ((list? (car pe))
+        (cons (annotate-helper (car pe) #f) (annotate-helper (cdr pe) #f)))  
+      ((varOrConst (car pe))  pe)
+      ((equal? (car pe) 'applic)
+          (if isTailposition? 
+            `(tc-applic ,@(map annotateHelperFalse (cdr pe)))
+             `(,(car pe) ,@(map annotateHelperFalse (cdr pe)) )
+          ))
+      ((or (equal? (car pe) 'or) (equal? (car pe) 'seq) )
+          (let* 
+            ((reverseElements (reverse (cdr pe))) 
+                  (lastElemnt (car reverseElements))
+                  (reverseListWithoutLats    (cdr reverseElements))
+                  (applyAnnotation  (map annotateHelperFalse reverseListWithoutLats))
+                  (annotatedLast   (annotate-helper lastElemnt isTailposition?))
+                  (afterAnnotation  (reverse (cons annotatedLast applyAnnotation))))
+              
+
+
+            
+            `(,(car pe)   ,afterAnnotation)
+            
+            )
+      )
+
+      ((equal? (car pe) 'if3)
+        (let ((test (getTestIfExp pe))
+              (then (getThenIfExp pe))
+              (alternate (getAltIfExp pe)))
+
+              `(if3 ,(annotate-helper test #f)
+                    ,(annotate-helper then isTailposition?)
+                    ,(annotate-helper alternate isTailposition?)
+              )
+          )
+      )
+      ((getLambdaType pe)
+            (let*
+              ((lambdaType (getLambdaType pe))
+              (lambdaVars (getLambdaVars lambdaType pe))
+              (lambdaBody (getLambdaBody lambdaType pe)))
+              
+              `(,lambdaType ,lambdaVars ,(annotate-helper lambdaBody #t))
+            ))
+
+        ((defineOrSet (car pe))
+          `(,(car pe) ,(cadr pe) ,(annotateHelperFalse (caddr pe)) )
+          )
+      (else 
+        (cons (car pe) (annotateHelperFalse (cdr pe) ))
+        )
+
+    )  
+  )
+  
+)
+
+(define annotate-tc
+  (lambda  (pe)
+    (annotate-helper pe #f)
+  )
+)
 
 
  
