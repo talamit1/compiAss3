@@ -189,7 +189,7 @@
 )
 
 (define isBoundVar?
-  (lambda (exp var)
+  (lambda (exp var inLambda)
 
   ;;(debugPrint exp)
   (cond
@@ -199,10 +199,10 @@
     ;;this is a symbol and not a set exp
     ((symbol? exp) #f)
 
-    ((equal? (car exp) 'var) (equal? (cadr exp) var ))
+    ((and (equal? (car exp) 'var) inLambda) (equal? (cadr exp) var ))
 
     ((list? (car exp)) 
-      (or (isBoundVar? (car exp) var) (isBoundVar? (cdr exp) var) ))
+      (or (isBoundVar? (car exp) var inLambda) (isBoundVar? (cdr exp) var inLambda) ))
     
       ((getLambdaType  exp)
         (let* 
@@ -211,18 +211,18 @@
           (lambdaBody (getLambdaBody lambdaType exp)))
           (if (checkForDuplicateParam lambdaVars var)
               #f
-              (isBoundVar? lambdaBody var)
+              (isBoundVar? lambdaBody var #t)
           )
         )
      )
      ((equal? (car exp) 'set)
           (if (null? (cdr exp))
             #f
-            (isBoundVar? (cddr exp) var )
+            (isBoundVar? (cddr exp) var inLambda)
           )
      )
      (else
-      (isBoundVar? (cdr exp) var )
+      (isBoundVar? (cdr exp) var  inLambda)
       )
   
     )
@@ -236,7 +236,7 @@
         
        (isReadVar? body var) 
         
-      (isBoundVar? body var))
+      (isBoundVar? body var #f))
   )
 
 )
@@ -247,6 +247,7 @@
 (define boxVarLambdaBody
   (lambda (body)
     (lambda (var)
+      
       (if (needBoxing? body var)
           var
          `() 
@@ -316,7 +317,7 @@
 
 (define boxVars 
   (lambda (lambdaBody lambdaVars)
-    
+  (debugPrint lambdaVars)
     (if (null? lambdaVars)
           lambdaBody
     (boxVars (putVarInBox lambdaBody (car lambdaVars)) (cdr lambdaVars))
@@ -332,6 +333,7 @@
 
 (define boxSetLambda
   (lambda (lambdaType expr)
+  
 
   (let* 
       ((lambdaVars (getLambdaVars lambdaType expr))
@@ -339,7 +341,8 @@
       (boxVarProc (boxVarLambdaBody lambdaBody))
       (boxedParams (filter (lambda (x) (not (equal? x '() ))) (map boxVarProc lambdaVars)))
       (boxedBody  (boxVars lambdaBody  boxedParams)))
-            
+
+      
       `(,lambdaType ,lambdaVars ,(box-set boxedBody)) 
     ;;`(,lambdaType ,lambdaVars ,boxedParams)
 
@@ -552,9 +555,13 @@
 
 (define annotate-helper
   (lambda (pe isTailposition?)
+    
+
+    
     (cond
       ((null? pe) '())
       ((list? (car pe))
+        
         (cons (annotate-helper (car pe) #f) (annotate-helper (cdr pe) #f)))  
       ((varOrConst (car pe))  pe)
       ((equal? (car pe) 'applic)
@@ -570,11 +577,11 @@
                   (applyAnnotation  (map annotateHelperFalse reverseListWithoutLats))
                   (annotatedLast   (annotate-helper lastElemnt isTailposition?))
                   (afterAnnotation  (reverse (cons annotatedLast applyAnnotation))))
-              
+        
 
-
+                  
             
-            `(,(car pe)   ,afterAnnotation)
+            `(,(car pe)   ,@afterAnnotation)
             
             )
       )
