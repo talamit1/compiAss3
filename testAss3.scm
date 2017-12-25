@@ -81,13 +81,13 @@
 (load "tag-parser.scm")
 (define test-func (lambda (x) 
 		  (def-changer (lambda-opt-changer
-		    ;;(annotate-tc
-		      ;;(pe->lex-pe
+		    (annotate-tc
+		      (pe->lex-pe
 			(box-set
 			  (remove-applic-lambda-nil
 			    (eliminate-nested-defines
 						(parse x))))))))
-						;;))
+						))
 			    
 (load "hw3.so")			    
 
