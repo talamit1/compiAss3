@@ -2,11 +2,14 @@
   (lambda  (exp)
     (let ((applic (car exp))
           (proc   (lambda () (caadr exp)))
-          (procArg (lambda () (cadadr exp))))
+          (procArg (lambda () (cadadr exp)))
+          (givenArg (lambda () (caddr exp)))
+          )
 
           (and (equal? applic 'applic) 
                (equal? (proc) 'lambda-simple) 
                (null? (procArg))
+               (null? (givenArg) )
           )    
     )
   )
@@ -111,6 +114,7 @@
 
 (define getLambdaBody
   (lambda (lambdaType expr)
+  
     (if (equal? lambdaType 'lambda-simple) 
       (caddr expr)
       (cadddr expr)
@@ -190,7 +194,7 @@
 
 (define isBoundVar?
   (lambda (exp var inLambda)
-
+  
   ;;(debugPrint exp)
   (cond
     ;;vase we finish search
@@ -218,7 +222,8 @@
      ((equal? (car exp) 'set)
           (if (null? (cdr exp))
             #f
-            (isBoundVar? (cddr exp) var inLambda)
+            (or (isBoundVar? (cadr exp) var inLambda) 
+              (isBoundVar? (cddr exp) var inLambda))
           )
      )
      (else
@@ -258,6 +263,8 @@
 )
 
 
+
+
 (define changeVarsInBody
   (lambda (exp var)
   
@@ -284,8 +291,26 @@
             
             (if (checkForDuplicateParam lambdaVars var)
                 exp
-                (cons (cons lambdaType (cons lambdaVars (changeVarsInBody (list lambdaBody) var)))
-                 (changeVarsInBody (cdr exp) var)))
+                (if (equal? lambdaType 'lambda-simple) 
+                  (cons (cons lambdaType (cons lambdaVars (changeVarsInBody (list lambdaBody) var)))
+                 (changeVarsInBody (cdr exp) var))
+                  (if (null? (cadar exp))
+                  
+                      (cons 
+                        (cons lambdaType 
+                          (cons '() 
+                            (cons (caddar exp) (changeVarsInBody (list (cadddr (car exp))) var))))
+                      (changeVarsInBody (cdr exp) var))
+
+                      (cons 
+                        (cons lambdaType 
+                          (cons (cadr (car expr)) 
+                            (cons (caddr (car expr)) (changeVarsInBody (list (cadddr (car exp))) var))))
+                      (changeVarsInBody (cdr exp) var))               
+                            
+                  )
+                )
+           )
         ))
        ((and (list? exp) 
               
@@ -317,7 +342,6 @@
 
 (define boxVars 
   (lambda (lambdaBody lambdaVars)
-  (debugPrint lambdaVars)
     (if (null? lambdaVars)
           lambdaBody
     (boxVars (putVarInBox lambdaBody (car lambdaVars)) (cdr lambdaVars))
@@ -333,25 +357,27 @@
 
 (define boxSetLambda
   (lambda (lambdaType expr)
-  
+    
 
-  (let* 
-      ((lambdaVars (getLambdaVars lambdaType expr))
-      (lambdaBody (getLambdaBody lambdaType expr))
-      (boxVarProc (boxVarLambdaBody lambdaBody))
-      (boxedParams (filter (lambda (x) (not (equal? x '() ))) (map boxVarProc lambdaVars)))
-      (boxedBody  (boxVars lambdaBody  boxedParams)))
+    (let* 
+        ((lambdaVars (getLambdaVars lambdaType expr))
+        (lambdaBody (getLambdaBody lambdaType expr))
+        (boxVarProc (boxVarLambdaBody lambdaBody))
+        (boxedParams (filter (lambda (x) (not (equal? x '() ))) (map boxVarProc (reverse lambdaVars))))
+        (boxedBody  (boxVars lambdaBody  boxedParams)))
 
-      
-      `(,lambdaType ,lambdaVars ,(box-set boxedBody)) 
-    ;;`(,lambdaType ,lambdaVars ,boxedParams)
+        (if (equal? lambdaType 'lambda-simple)
+        `(,lambdaType ,lambdaVars ,(box-set boxedBody)) ;;simple
+          (if (null? (cadr expr))
+            `(,lambdaType () ,@lambdaVars ,(box-set boxedBody)) ;;variadic
+            `(,lambdaType ,(cadr expr) ,(caddr expr) ,(box-set boxedBody)) ;;optional
+          )
+        )
 
-      )
+    )
 
   )
 )
-
-
 
 (define box-set
   (lambda (parsedExpr)
@@ -500,8 +526,8 @@
                 (newScope (updt-scope-lst scope newParams));;new scope list
               )
               (if (null? (cadr ast))
-              `(lambda-opt  () ,@lamVrs ,(auxiliary-pe->lex-pe lamBody newScope newParams)) ;;optional  
-              `(lambda-opt ,(cadr ast) ,(caddr ast)  ,(auxiliary-pe->lex-pe lamBody newScope newParams)) ;;variadic
+              `(lambda-opt  () ,@lamVrs ,(auxiliary-pe->lex-pe lamBody newScope newParams))  ;;variadic
+              `(lambda-opt ,(cadr ast) ,(caddr ast)  ,(auxiliary-pe->lex-pe lamBody newScope newParams)) ;;optional
               )
         ) 
       ) 
@@ -574,18 +600,14 @@
           ))
       ((or (equal? (car pe) 'or) (equal? (car pe) 'seq) )
           (let* 
-            ((reverseElements (reverse (cdr pe))) 
+            ((reverseElements (reverse (cadr pe))) 
                   (lastElemnt (car reverseElements))
                   (reverseListWithoutLats    (cdr reverseElements))
                   (applyAnnotation  (map annotateHelperFalse reverseListWithoutLats))
                   (annotatedLast   (annotate-helper lastElemnt isTailposition?))
                   (afterAnnotation  (reverse (cons annotatedLast applyAnnotation))))
-        
-
-                  
             
-            `(,(car pe)   ,@afterAnnotation)
-            
+            `(,(car pe)   ,afterAnnotation)
             )
       )
 
@@ -606,7 +628,13 @@
               (lambdaVars (getLambdaVars lambdaType pe))
               (lambdaBody (getLambdaBody lambdaType pe)))
               
-              `(,lambdaType ,lambdaVars ,(annotate-helper lambdaBody #t))
+              (if (equal? lambdaType 'lambda-simple)
+              `(,lambdaType ,lambdaVars ,(annotate-helper lambdaBody #t)) ;;simple
+                (if (null? (cadr pe))
+                  `(,lambdaType () ,@lambdaVars ,(annotate-helper lambdaBody #t)) ;;variadic
+                  `(,lambdaType ,(cadr pe) ,(caddr pe) ,(annotate-helper lambdaBody #t)) ;;optional
+                )
+              )
             ))
 
         ((defineOrSet (car pe))
@@ -626,3 +654,5 @@
     (annotate-helper pe #f)
   )
 )
+
+
