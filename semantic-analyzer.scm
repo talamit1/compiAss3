@@ -499,7 +499,10 @@
                 (newParams (updt-params-lst lamVrs));;new params list
                 (newScope (updt-scope-lst scope newParams));;new scope list
               )
-               `(lambda-opt ,lamvars ,(auxiliary-pe->lex-pe lamBody newScope newParams))
+              (if (null? (cadr ast))
+              `(lambda-opt  () ,@lamVrs ,(auxiliary-pe->lex-pe lamBody newScope newParams)) ;;optional  
+              `(lambda-opt ,(cadr ast) ,(caddr ast)  ,(auxiliary-pe->lex-pe lamBody newScope newParams)) ;;variadic
+              )
         ) 
       ) 
               
