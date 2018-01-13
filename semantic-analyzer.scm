@@ -304,8 +304,8 @@
 
                       (cons 
                         (cons lambdaType 
-                          (cons (cadr (car expr)) 
-                            (cons (caddr (car expr)) (changeVarsInBody (list (cadddr (car exp))) var))))
+                          (cons (cadr (car exp)) 
+                            (cons (caddr (car exp)) (changeVarsInBody (list (cadddr (car exp))) var))))
                       (changeVarsInBody (cdr exp) var))               
                             
                   )
@@ -332,7 +332,6 @@
 
 (define putVarInBox
   (lambda (expr var)
-
    (if (equal? 'seq (car expr))
    `(seq ((set (var ,var) (box (var ,var))) ,@(changeVarsInBody (cadr expr) var)))
    `(seq ((set (var ,var) (box (var ,var))) ,@(list (changeVarsInBody  expr var)))))
@@ -357,15 +356,13 @@
 
 (define boxSetLambda
   (lambda (lambdaType expr)
-    
-
     (let* 
         ((lambdaVars (getLambdaVars lambdaType expr))
         (lambdaBody (getLambdaBody lambdaType expr))
         (boxVarProc (boxVarLambdaBody lambdaBody))
         (boxedParams (filter (lambda (x) (not (equal? x '() ))) (map boxVarProc (reverse lambdaVars))))
         (boxedBody  (boxVars lambdaBody  boxedParams)))
-
+      
         (if (equal? lambdaType 'lambda-simple)
         `(,lambdaType ,lambdaVars ,(box-set boxedBody)) ;;simple
           (if (null? (cadr expr))
@@ -381,7 +378,7 @@
 
 (define box-set
   (lambda (parsedExpr)
-  
+    
     (cond 
       ((null? parsedExpr) '())
       
